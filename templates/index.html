@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon">
+    </head>
+    <body>
+        <div style="margin: 10px 0;">
+            <button id="record" onclick="start()">Start</button>
+            <button id="stop" onclick="stop()" disabled>Stop</button>
+        </div>
+        <textarea id="output" name="output" id="" cols="30" rows="10"></textarea>
+    </body>
+    <script>
+        let recorder;
+        let interval;
+        let SECONDS = 1;
+        let chunks = [];
+
+        const recordButton = document.getElementById('record');
+        const stopButton = document.getElementById('stop');
+        const textArea = document.getElementById('output');
+        
+        function start(){
+            recordButton.disabled = true;
+            stopButton.disabled = false;
+
+            startRecording();
+            interval = setInterval(function(){ 
+                endRecording(); 
+                startRecording(); 
+            }, SECONDS * 1000);
+        }
+
+        function stop(){
+            clearInterval(interval);
+            recordButton.disabled = false;
+            stopButton.disabled = true;
+
+            endRecording();
+        }
+
+        function startRecording() {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                recorder = new MediaRecorder(stream);
+                recorder.start();
+                recorder.ondataavailable = sendAudio;
+            });
+        }
+
+        function endRecording() {
+            recorder.stop();
+        }
+
+        function sendAudio(e) {
+            chunks.push(e.data);
+                
+            let blob = new Blob(chunks, { type: 'audio/wav' });
+            //chunks = [];
+
+            let formData = new FormData();
+            formData.append('audio', blob, `audio.wav`);
+
+            fetch('http://localhost:8000/api/transcribe/',
+            {
+                method: 'post',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(success => {
+                if (success["success"]) {
+                    textArea.value = success["data"];
+                    console.log(success["data"]);
+                }
+            })
+            .catch(error => console.error("Error:", error));    
+        }
+
+    </script>
+</html>
